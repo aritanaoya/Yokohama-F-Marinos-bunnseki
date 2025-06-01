@@ -121,7 +121,9 @@ def generate_team_metrics_ranking_table(match_dates_to_compare, metrics_to_compa
     return "\n".join(lines)
 
 # Markdown形式の試合分析テンプレートを生成する関数
-def generate_markdown_template(team_row, opponent_row, zscore_summary, win_pattern_table, team_metrics_ranking_table, match_date):
+def generate_markdown_template(
+        team_row, opponent_row, zscore_summary, win_pattern_table, team_metrics_ranking_table_att, team_metrics_ranking_table_def, match_date
+        ):
     def stat_line(metric):
         try:
             t, o = float(team_row[metric]), float(opponent_row[metric])
@@ -158,6 +160,7 @@ def generate_markdown_template(team_row, opponent_row, zscore_summary, win_patte
 3. 明るい材料（ポジティブな指標から3行程度）
 4. Zスコア指標上位5件へのコメント（1行ずつ）
 5. 勝ちパターンとの比較から気づいたこと（数値差と傾向に基づき2〜3行）
+6. 同節のチーム間指標比較からの考察（攻撃、守備の順位表を掲載しそれを元に考察を2〜3行）
 
 noteにそのまま貼り付けができるよう、mdを穴埋めする形で生成をしてください
 ---
@@ -215,11 +218,15 @@ Zスコアは「平均からどれだけ離れているか」を表す統計指�
 この分析では、同節のチーム間の指標を比較しマリノスのリーグ全体の位置を確認しています。
 
 - リーグ全体においてマリノスの指標はどうだったか？
-- どこが足りなかったのか？あるいは優れていたのか？
 
-チームの勝利要因（パターン）を再確認するための参考になります。
+以下、各指標の順位表になります。（順位表も記事に掲載）
+攻撃指標
+{team_metrics_ranking_table_att}
 
-{team_metrics_ranking_table}
+守備指標
+{team_metrics_ranking_table_def}
+
+【考察をここに記入】
 
 ---
 
@@ -240,7 +247,10 @@ Zスコアは「平均からどれだけ離れているか」を表す統計指�
 # 同節のマリノス戦含む全試合（全チーム）の指標比較を出力する関数
 
 # レポート全体を実行してMarkdownを出力する関数
-def generate_report(csv_path, output_path, match_date, match_dates_to_compare, metrics_for_team_rank, team_name="Yokohama F. Marinos", ):
+def generate_report(
+        csv_path, output_path, match_date, match_dates_to_compare, 
+        metrics_for_team_rank_att, metrics_for_team_rank_def, 
+        team_name="Yokohama F. Marinos"):
     df = pd.read_csv(csv_path)
     df["Date"] = pd.to_datetime(df["Date"], format="%Y-%m-%d", errors="coerce")
     df[columns_to_analyze] = df[columns_to_analyze].apply(pd.to_numeric, errors='coerce')
@@ -264,11 +274,18 @@ def generate_report(csv_path, output_path, match_date, match_dates_to_compare, m
     ]
 
     win_pattern_table = generate_win_pattern_table(df, team_name, team_row,key_comparison_metrics)
-    team_metrics_ranking_table = generate_team_metrics_ranking_table(
+    team_metrics_ranking_table_att = generate_team_metrics_ranking_table(
         match_dates_to_compare=match_dates_to_compare,
-        metrics_to_compare=metrics_for_team_rank
+        metrics_to_compare=metrics_for_team_rank_att
     )
-    md_text = generate_markdown_template(team_row, opponent_row, zscore_summary, win_pattern_table, team_metrics_ranking_table, match_date)
+    team_metrics_ranking_table_def = generate_team_metrics_ranking_table(
+        match_dates_to_compare=match_dates_to_compare,
+        metrics_to_compare=metrics_for_team_rank_def
+    )
+    md_text = generate_markdown_template(
+        team_row, opponent_row, zscore_summary, win_pattern_table, 
+        team_metrics_ranking_table_att, team_metrics_ranking_table_def, match_date
+        )
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(md_text)
@@ -296,11 +313,12 @@ columns_to_analyze = ['xG', 'Shots', 'Shots on target', 'Shots on target%', 'Pas
 'Smart passes accurate%', 'Throw ins', 'Throw ins accurate', 'Throw ins accurate%', 'Goal kicks', 'Match tempo',
 'Average passes per possession', 'Long pass %', 'Average shot distance', 'Average pass length', 'PPDA']
 
-metrics_for_team_rank = [
-        "xG", "Goals", "Shots on target", "Average shot distance",
-        "Conceded goals", "Shots against on target",
-        "Possession, %", "Passes accurate%",
-        "PPDA", "Duels won%","Long passes","Long passes accurate%","Long pass %"
+# デフォルトは主要スタッツ比較と同じ指標
+metrics_for_team_rank_att = [
+    "xG", "Shots on target", "Possession, %", "Match tempo", "Long passes"
+    ]
+metrics_for_team_rank_def = [
+    'Conceded goals', 'Shots against','Shots against on target', "PPDA", 'Defensive duels won%'
     ]
 
 # 実行部分（試合日付とファイルパスを指定）
@@ -315,6 +333,7 @@ if __name__ == "__main__":
         output_path="output/Yokohama-F_gpt_prompt.md",
         match_date="2025-05-21",
         match_dates_to_compare=["2025-05-24", "2025-05-25"],
-        metrics_for_team_rank=metrics_for_team_rank,
+        metrics_for_team_rank_att=metrics_for_team_rank_att,
+        metrics_for_team_rank_def=metrics_for_team_rank_def,
         team_name="Yokohama F. Marinos"
     )
